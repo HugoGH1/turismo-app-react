@@ -56,6 +56,15 @@ export default function Home() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView className="flex-1">
+        {/* —— Botón ir a Estadísticas —— */}
+        <View className="px-4 py-2">
+          <TouchableOpacity
+            className="bg-blue-500 rounded-lg px-4 py-2 mb-4"
+            onPress={() => router.push("/Estadisticas")}
+          >
+            <Text className="text-white font-medium text-center">Ir a Estadísticas</Text>
+         </TouchableOpacity>
+        </View>
         <View className="flex-1 items-center justify-center mb-12">
           <View className="bg-slate-100 w-full border border-blue-400  p-4">
             <Text className="text-2xl font-bold mb-2">
