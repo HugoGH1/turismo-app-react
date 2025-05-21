@@ -2,6 +2,7 @@
   import { supabase } from "../../supabase/supabase";
   import AsyncStorage from '@react-native-async-storage/async-storage';
   import { useNavigation } from '@react-navigation/native';
+  import { useRouter } from "expo-router";
   import {
     View,
     Text,
@@ -13,6 +14,35 @@
     Switch,
   } from "react-native";
   import { Ionicons } from "@expo/vector-icons";
+
+  const router = useRouter();
+
+  const imagenesEmpresas = {
+    "Denta Stick":
+      "https://jxcchonixqmpsnyefhfh.supabase.co/storage/v1/object/public/images/Dentista.jpg",
+    "SweetCake House":
+      "https://jxcchonixqmpsnyefhfh.supabase.co/storage/v1/object/public/images/Postres.jpg",
+    "Teatro Ricardo Castro":
+      "https://jxcchonixqmpsnyefhfh.supabase.co/storage/v1/object/public/images/Teatro.jpg",
+  };
+
+   const getEmpresas = async () => {
+    let { data: Empresas, error } = await supabase.from("Empresas").select(`
+    Nombre,
+    Descripcion,
+    Portada,
+    RutaDestino,
+    Calle,
+    NumExt,
+    Colonia,
+    CodigoPost
+    `);
+    if (error) {
+      console.log(error);
+    } else {
+      setEmpresas(Empresas);
+    }
+  };
 
   const guardarBusquedaReciente = async (texto) => {
     if (!texto.trim()) return;
@@ -122,8 +152,9 @@
       const todasActiva = filtrosActivos.some(f => f.isAll);
     
       const coincidenciasLocales = busquedasRecientes.filter((b) =>
-        b.toLowerCase().includes(textoMinuscula)
+        b.Nombre.toLowerCase().includes(textoMinuscula)
       );
+      
     
       let coincidenciasRemotas = [];
     
@@ -154,19 +185,20 @@
         }
       }
     
-      // Unificar resultados y eliminar duplicados
-      const nombresUnicos = [];
+      const empresasUnicas = [];
       const lowerSet = new Set();
-    
-      [...coincidenciasLocales, ...coincidenciasRemotas].forEach(nombre => {
-        const key = nombre.trim().toLowerCase();
+      
+      [...coincidenciasLocales, ...coincidenciasRemotas.map(nombre => ({ Nombre: nombre }))].forEach(emp => {
+        const key = emp.Nombre.trim().toLowerCase();
         if (!lowerSet.has(key)) {
           lowerSet.add(key);
-          nombresUnicos.push(nombre);
+          empresasUnicas.push(emp);
         }
       });
-    
-      setEmpresas(nombresUnicos);
+      
+      setEmpresas(empresasUnicas);
+      
+
     };
     
        
@@ -176,13 +208,29 @@
 
     const [busquedasRecientes, setBusquedasRecientes] = useState([]);
 
+
     const cargarBusquedasRecientes = async () => {
       try {
-        const jsonValue = await AsyncStorage.getItem('busquedasRecientes');
-        const busquedas = jsonValue != null ? JSON.parse(jsonValue) : [];
-        setBusquedasRecientes(busquedas);
+        const jsonValue = await AsyncStorage.getItem("busquedasRecientes");
+        const nombres = jsonValue != null ? JSON.parse(jsonValue) : [];
+    
+        if (nombres.length === 0) {
+          setBusquedasRecientes([]);
+          return;
+        }
+    
+        const { data, error } = await supabase
+          .from("Empresas")
+          .select("*")
+          .in("Nombre", nombres.map((e) => e.Nombre || e));
+    
+        if (error) {
+          console.error("Error al obtener empresas recientes:", error);
+        } else {
+          setBusquedasRecientes(data);
+        }
       } catch (e) {
-        console.error('Error cargando búsquedas recientes:', e);
+        console.error("Error al cargar búsquedas recientes:", e);
       }
     };
     
@@ -230,15 +278,25 @@
         {/* Busquedas recientes */}
         {mostrarRecientes && busquedasRecientes.length > 0 && (
   <View style={{ marginBottom: 16 }}>
-    {busquedasRecientes.map((busqueda, index) => (
+    {busquedasRecientes.map((empresa, index) => (
       <TouchableOpacity
         key={index}
         style={styles.empresaItem}
-        onPress={() => {
-          navigation.navigate("/planes", {});
-        }}
+        onPress={() =>
+          router.push({
+            pathname: `/planes/${empresa.RutaDestino}`,
+            params: {
+              title: empresa.Nombre,
+              description: empresa.Descripcion,
+              direccion: `${empresa.Calle} ${empresa.NumExt}, ${empresa.Colonia}, CP: ${empresa.CodigoPost}`,
+              imageUrl:
+                imagenesEmpresas[empresa.Nombre] ||
+                "https://via.placeholder.com/300x200",
+            },
+          })
+        }
       >
-        <Text>{busqueda}</Text>
+        <Text>{empresa.Nombre}</Text>
         <Ionicons name="reload" size={20} />
       </TouchableOpacity>
     ))}
@@ -249,21 +307,32 @@
         {/* Lista de empresas */}
         <FlatList
   data={empresas}
-  keyExtractor={(item) => item}
+  keyExtractor={(item) => (typeof item === 'string' ? item : item.Nombre)}
   renderItem={({ item }) => {
+    const nombreEmpresa = typeof item === 'string' ? item : item.Nombre;
     const esReciente = busquedasRecientes
-      .map((b) => b.toLowerCase().trim())
-      .includes(item.toLowerCase().trim());
+      .map((b) => (typeof b === 'string' ? b : b.Nombre).toLowerCase().trim())
+      .includes(nombreEmpresa.toLowerCase().trim());
 
     return (
       <TouchableOpacity
         style={styles.empresaItem}
         onPress={() => {
-          navigation.navigate("/planes", {});
-          guardarBusquedaReciente(item);
+          guardarBusquedaReciente(nombreEmpresa);
+          router.push({
+            pathname: `/planes/${item.RutaDestino}`,
+            params: {
+              title: nombreEmpresa,
+              description: item.Descripcion,
+              direccion: `${item.Calle} ${item.NumExt}, ${item.Colonia}, CP: ${item.CodigoPost}`,
+              imageUrl:
+                imagenesEmpresas[nombreEmpresa] ||
+                "https://via.placeholder.com/300x200",
+            },
+          });
         }}
       >
-        <Text>{item}</Text>
+        <Text>{nombreEmpresa}</Text>
         <Ionicons
           name={esReciente ? "reload" : "chevron-forward"}
           size={20}
@@ -272,6 +341,7 @@
     );
   }}
 />
+
 
 
 
