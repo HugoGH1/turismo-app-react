@@ -147,60 +147,45 @@
 
     const buscarEmpresas = async (texto) => {
       const textoMinuscula = texto.toLowerCase();
-    
       const filtrosActivos = filters.filter(f => f.active);
-    
       const todasActiva = filtrosActivos.some(f => f.isAll);
-    
-      const coincidenciasLocales = busquedasRecientes.filter((b) =>
-        b.Nombre.toLowerCase().includes(textoMinuscula)
-      );
-      
-    
       let coincidenciasRemotas = [];
     
+      const campos = 'Nombre,Descripcion,RutaDestino,Calle,NumExt,Colonia,CodigoPost';
+    
       if (todasActiva) {
-        // Buscar sin filtrar por categoría
         const { data, error } = await supabase
           .from('Empresas')
-          .select('Nombre')
+          .select(campos)
           .ilike('Nombre', `%${texto}%`);
-    
-        if (!error && data) {
-          coincidenciasRemotas = data.map((empresa) => empresa.Nombre);
-        }
+        if (!error && data) coincidenciasRemotas = data;
       } else {
-        // Obtener IDs de filtros activos normales
         const categoriasActivas = filtrosActivos.map(f => f.id);
-    
         if (categoriasActivas.length > 0) {
           const { data, error } = await supabase
             .from('Empresas')
-            .select('Nombre')
+            .select(campos)
             .ilike('Nombre', `%${texto}%`)
             .in('idCategoria', categoriasActivas);
-    
-          if (!error && data) {
-            coincidenciasRemotas = data.map((empresa) => empresa.Nombre);
-          }
+          if (!error && data) coincidenciasRemotas = data;
         }
       }
     
+      // Eliminar duplicados
       const empresasUnicas = [];
       const lowerSet = new Set();
-      
-      [...coincidenciasLocales, ...coincidenciasRemotas.map(nombre => ({ Nombre: nombre }))].forEach(emp => {
+    
+      coincidenciasRemotas.forEach(emp => {
         const key = emp.Nombre.trim().toLowerCase();
         if (!lowerSet.has(key)) {
           lowerSet.add(key);
           empresasUnicas.push(emp);
         }
       });
-      
+    
       setEmpresas(empresasUnicas);
-      
-
     };
+    
     
        
     
@@ -308,11 +293,20 @@
         {/* Lista de empresas */}
         <FlatList
   data={empresas}
-  keyExtractor={(item) => (typeof item === 'string' ? item : item.Nombre)}
+  keyExtractor={(item, index) => {
+    if (!item) return index.toString();
+    return typeof item === 'string' ? item : item.Nombre || index.toString();
+  }}
   renderItem={({ item }) => {
-    const nombreEmpresa = typeof item === 'string' ? item : item.Nombre;
+    if (!item) return null;
+
+    const nombreEmpresa =
+      typeof item === 'string' ? item : item.Nombre || 'Empresa desconocida';
+
     const esReciente = busquedasRecientes
-      .map((b) => (typeof b === 'string' ? b : b.Nombre).toLowerCase().trim())
+      .map((b) =>
+        (typeof b === 'string' ? b : b?.Nombre || '').toLowerCase().trim()
+      )
       .includes(nombreEmpresa.toLowerCase().trim());
 
     return (
@@ -321,27 +315,28 @@
         onPress={() => {
           guardarBusquedaReciente(nombreEmpresa);
           router.push({
-            pathname: `/planes/${item.RutaDestino}`,
+            pathname: `/planes/${item?.RutaDestino || ''}`,
             params: {
               title: nombreEmpresa,
-              description: item.Descripcion,
-              direccion: `${item.Calle} ${item.NumExt}, ${item.Colonia}, CP: ${item.CodigoPost}`,
+              description: item?.Descripcion || 'Sin descripción',
+              direccion: `${item?.Calle || ''} ${item?.NumExt || ''}, ${item?.Colonia || ''}, CP: ${item?.CodigoPost || ''}`,
               imageUrl:
                 imagenesEmpresas[nombreEmpresa] ||
-                "https://via.placeholder.com/300x200",
+                'https://via.placeholder.com/300x200',
             },
           });
         }}
       >
         <Text>{nombreEmpresa}</Text>
         <Ionicons
-          name={esReciente ? "reload" : "chevron-forward"}
+          name={esReciente ? 'reload' : 'chevron-forward'}
           size={20}
         />
       </TouchableOpacity>
     );
   }}
 />
+
 
 
 
