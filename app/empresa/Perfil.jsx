@@ -1,7 +1,9 @@
 import { View, Text, ScrollView, Image, ActivityIndicator, Dimensions } from "react-native";
 import { useEffect, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
 import { supabase } from "../../supabase/supabase";
 import { LineChart, BarChart } from "react-native-chart-kit";
+
 import moment from "moment"; // npm install moment
 import 'moment/locale/es';
 
@@ -10,6 +12,10 @@ export default function PerfilEmpresa() {
   const [loading, setLoading] = useState(true);
   const [estadisticasPorMes, setEstadisticasPorMes] = useState({});
   const [chartData, setChartData] = useState(null);
+  const { idEmpresa } = useLocalSearchParams();
+
+
+  
 
   useEffect(() => {
     async function fetchEmpresa() {
@@ -18,7 +24,7 @@ export default function PerfilEmpresa() {
       const { data, error } = await supabase
         .from("Empresas")
         .select("*")
-        .eq("idEmpresa", 1)//id empresa
+        .eq("idEmpresa", idEmpresa)//id empresa
         .single();
 
       if (error) {

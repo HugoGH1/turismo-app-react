@@ -37,46 +37,48 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     setLoading(true);
-
+  
     if (!email || !password) {
       Alert.alert("Error", "Por favor, ingresa tu correo y contraseña.");
       setLoading(false);
       return;
     }
-
+  
     try {
-      const { data, error } = await supabase
+      // Consulta tabla 'Usuarios'
+      const { data: userData, error: userError } = await supabase
         .from("Usuarios")
         .select("idUser, Email")
         .eq("Email", email)
         .eq("Password", password)
         .single();
-
-      if (error) {
-        if (error.code === "PGRST116") {
-          Alert.alert(
-            "Error de inicio de sesión",
-            "Correo electrónico o contraseña incorrectos.",
-          );
-        } else {
-          Alert.alert(
-            "Error",
-            "Ocurrió un error al verificar las credenciales: " + error.message,
-          );
-          console.error(
-            "Error al buscar usuario en la tabla 'Usuarios':",
-            error,
-          );
-        }
-      } else if (data) {
+  
+      if (userData) {
         Alert.alert("Éxito", "¡Inicio de sesión exitoso!");
-        console.log("Usuario autenticado:", data);
+        console.log("Usuario autenticado (Usuarios):", userData);
         router.replace("/Home");
       } else {
-        Alert.alert(
-          "Error de inicio de sesión",
-          "Correo electrónico o contraseña incorrectos.",
-        );
+        // Si no está en 'Usuarios', buscar en 'userAdmin'
+        const { data: adminData, error: adminError } = await supabase
+          .from("UserAdmin")
+          .select("idEmpresa, Email")
+          .eq("Email", email)
+          .eq("Password", password)
+          .single();
+  
+        if (adminData) {
+          Alert.alert("Éxito", "¡Inicio de sesión como administrador!");
+          console.log("Administrador autenticado:", adminData);
+          router.replace(`/empresa/Perfil?idEmpresa=${adminData.idEmpresa}`);//?idEmpresa=${adminData.idEmpresa}
+        } else {
+          // Errores específicos o no encontrado en ambas tablas
+          if (userError?.code === "PGRST116" && adminError?.code === "PGRST116") {
+            Alert.alert("Error de inicio de sesión", "Correo electrónico o contraseña incorrectos.");
+          } else {
+            const message = userError?.message || adminError?.message || "Error desconocido.";
+            Alert.alert("Error", "Ocurrió un error al verificar las credenciales: " + message);
+          }
+        }
       }
     } catch (error) {
       Alert.alert("Error", "Ocurrió un error inesperado al iniciar sesión.");
@@ -85,7 +87,7 @@ export default function LoginScreen() {
       setLoading(false);
     }
   };
-
+  
   return (
     <SafeAreaView className="flex-1 bg-[#1a1e22]">
       <StatusBar barStyle="light-content" backgroundColor="#1a1e22" />
